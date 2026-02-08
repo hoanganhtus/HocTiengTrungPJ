@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 
 class ModelType(Enum):
     """Các model AI hỗ trợ"""
+
     GPT4O = "gpt-4o"
     GPT4_TURBO = "gpt-4-turbo-preview"
     GPT35_TURBO = "gpt-3.5-turbo"
@@ -28,13 +29,14 @@ class ModelType(Enum):
 @dataclass
 class AIConfig:
     """Cấu hình cho AI Engine"""
+
     api_key: Optional[str] = None
     model: str = ModelType.GPT4O.value
     temperature: float = 0.3
     max_tokens: int = 1000
     timeout: int = 30
     max_retries: int = 3
-    
+
     def __post_init__(self):
         if not self.api_key:
             self.api_key = os.environ.get("OPENAI_API_KEY")
@@ -43,40 +45,41 @@ class AIConfig:
 @dataclass
 class VocabularyEntry:
     """Dữ liệu từ vựng"""
+
     chinese: str
     pinyin: str
     vietnamese: str
     example: Optional[str] = None
-    
+
     def to_dict(self) -> Dict[str, Any]:
         return {
             "chinese": self.chinese,
             "pinyin": self.pinyin,
             "vietnamese": self.vietnamese,
-            "example": self.example
+            "example": self.example,
         }
 
 
 class ChineseAIEngine:
     """
     SDK chính cho AI Engine học tiếng Trung
-    
+
     Sử dụng:
         engine = ChineseAIEngine()
         result = engine.translate("你好")
     """
-    
+
     def __init__(self, config: Optional[AIConfig] = None):
         """
         Khởi tạo AI Engine
-        
+
         Args:
             config: Cấu hình tùy chỉnh (optional)
         """
         self.config = config or AIConfig()
         self._client: Optional[OpenAI] = None
         self._vocabulary_file = "tu_vung_trung_viet.txt"
-        
+
         # System prompts
         self.system_prompt = """
         Bạn là Gia sư song ngữ Trung - Việt chuyên nghiệp.
@@ -84,7 +87,7 @@ class ChineseAIEngine:
         2. Nếu nhập Tiếng Việt: Dịch Trung -> Hiện Pinyin -> Lưu từ Trung mới dịch được.
         Luôn ưu tiên gọi hàm 'luu_tu_vung' để lưu từ vựng.
         """
-        
+
         # Tools schema
         self.tools_schema = [
             {
@@ -95,16 +98,25 @@ class ChineseAIEngine:
                     "parameters": {
                         "type": "object",
                         "properties": {
-                            "chinese": {"type": "string", "description": "Từ vựng Tiếng Trung"},
-                            "pinyin": {"type": "string", "description": "Phiên âm Pinyin"},
-                            "vietnamese": {"type": "string", "description": "Nghĩa Tiếng Việt"},
+                            "chinese": {
+                                "type": "string",
+                                "description": "Từ vựng Tiếng Trung",
+                            },
+                            "pinyin": {
+                                "type": "string",
+                                "description": "Phiên âm Pinyin",
+                            },
+                            "vietnamese": {
+                                "type": "string",
+                                "description": "Nghĩa Tiếng Việt",
+                            },
                         },
                         "required": ["chinese", "pinyin", "vietnamese"],
                     },
                 },
             }
         ]
-    
+
     @property
     def client(self) -> OpenAI:
         """Lazy initialization của OpenAI client"""
@@ -114,53 +126,53 @@ class ChineseAIEngine:
                     "API key không tồn tại. Vui lòng cấu hình OPENAI_API_KEY "
                     "trong biến môi trường hoặc truyền vào config."
                 )
-            
+
             try:
                 self._client = OpenAI(
                     api_key=self.config.api_key,
                     timeout=self.config.timeout,
-                    max_retries=self.config.max_retries
+                    max_retries=self.config.max_retries,
                 )
                 logger.info("✓ OpenAI client initialized successfully")
             except Exception as e:
                 logger.error(f"✗ Failed to initialize OpenAI client: {e}")
                 raise
-        
+
         return self._client
-    
+
     def save_vocabulary(self, chinese: str, pinyin: str, vietnamese: str) -> str:
         """
         Lưu từ vựng vào file
-        
+
         Args:
             chinese: Từ tiếng Trung
             pinyin: Phiên âm Pinyin
             vietnamese: Nghĩa tiếng Việt
-            
+
         Returns:
             Thông báo kết quả
         """
         try:
             entry = VocabularyEntry(chinese, pinyin, vietnamese)
             content = f"{entry.chinese} ({entry.pinyin}) : {entry.vietnamese}\n"
-            
+
             with open(self._vocabulary_file, "a", encoding="utf-8") as f:
                 f.write(content)
-            
+
             logger.info(f"✓ Saved vocabulary: {chinese}")
             return f"✓ Đã lưu: {chinese} ({pinyin})"
-            
+
         except Exception as e:
             logger.error(f"✗ Failed to save vocabulary: {e}")
             return f"✗ Lỗi ghi file: {e}"
-    
+
     def translate(self, text: str) -> str:
         """
         Dịch văn bản và lưu từ vựng tự động
-        
+
         Args:
             text: Văn bản cần dịch (tiếng Trung hoặc tiếng Việt)
-            
+
         Returns:
             Kết quả dịch và giải thích
         """
@@ -169,9 +181,9 @@ class ChineseAIEngine:
                 {"role": "system", "content": self.system_prompt},
                 {"role": "user", "content": text},
             ]
-            
+
             logger.info(f"→ Translating: {text}")
-            
+
             # Gọi AI lần 1
             response = self.client.chat.completions.create(
                 model=self.config.model,
@@ -179,59 +191,61 @@ class ChineseAIEngine:
                 tools=self.tools_schema,
                 tool_choice="auto",
                 temperature=self.config.temperature,
-                max_tokens=self.config.max_tokens
+                max_tokens=self.config.max_tokens,
             )
-            
+
             message = response.choices[0].message
-            
+
             # Xử lý tool calls
             if message.tool_calls:
                 messages.append(message)
-                
+
                 for tool_call in message.tool_calls:
                     try:
                         args = json.loads(tool_call.function.arguments)
-                        
+
                         # Gọi function tương ứng
                         if tool_call.function.name == "save_vocabulary":
                             result = self.save_vocabulary(
-                                args["chinese"],
-                                args["pinyin"],
-                                args["vietnamese"]
+                                args["chinese"], args["pinyin"], args["vietnamese"]
                             )
                         else:
                             result = f"Unknown function: {tool_call.function.name}"
-                        
-                        messages.append({
-                            "role": "tool",
-                            "tool_call_id": tool_call.id,
-                            "content": result,
-                        })
-                        
+
+                        messages.append(
+                            {
+                                "role": "tool",
+                                "tool_call_id": tool_call.id,
+                                "content": result,
+                            }
+                        )
+
                     except Exception as e:
                         logger.error(f"✗ Tool execution error: {e}")
-                        messages.append({
-                            "role": "tool",
-                            "tool_call_id": tool_call.id,
-                            "content": f"Error: {str(e)}",
-                        })
-                
+                        messages.append(
+                            {
+                                "role": "tool",
+                                "tool_call_id": tool_call.id,
+                                "content": f"Error: {str(e)}",
+                            }
+                        )
+
                 # Gọi AI lần 2 để tổng hợp kết quả
                 final_response = self.client.chat.completions.create(
                     model=self.config.model,
                     messages=messages,
-                    temperature=self.config.temperature
+                    temperature=self.config.temperature,
                 )
-                
+
                 result = final_response.choices[0].message.content
                 logger.info(f"✓ Translation completed")
                 return result
-            
+
             # Không có tool call, trả về response trực tiếp
             result = message.content or "Không có kết quả"
             logger.info(f"✓ Direct response")
             return result
-            
+
         except Exception as e:
             logger.error(f"✗ Translation error: {e}")
             return f"✗ Lỗi kết nối OpenAI: {str(e)}"
@@ -239,6 +253,7 @@ class ChineseAIEngine:
 
 # Backward compatibility với code cũ
 client = None
+
 
 def get_openai_client():
     """[Deprecated] Sử dụng ChineseAIEngine thay thế"""

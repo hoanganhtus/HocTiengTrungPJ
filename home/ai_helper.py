@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 
 class TranslationMethod(Enum):
     """Phương thức dịch"""
+
     OPENAI = "AI (OpenAI)"
     GOOGLE = "Google Translate"
     FALLBACK = "Google Translate (Dự phòng)"
@@ -27,11 +28,12 @@ class TranslationMethod(Enum):
 @dataclass
 class VocabularyData:
     """Dữ liệu từ vựng chuẩn"""
+
     chinese: str = ""
     pinyin: str = ""
     vietnamese: str = ""
     example_sentence: str = ""
-    
+
     def to_dict(self) -> Dict[str, str]:
         return asdict(self)
 
@@ -39,16 +41,14 @@ class VocabularyData:
 @dataclass
 class TranslationResult:
     """Kết quả dịch"""
+
     success: bool
     method: str
     data: Optional[VocabularyData] = None
     error: Optional[str] = None
-    
+
     def to_dict(self) -> Dict[str, Any]:
-        result = {
-            "success": self.success,
-            "method": self.method
-        }
+        result = {"success": self.success, "method": self.method}
         if self.data:
             result["data"] = self.data.to_dict()
         if self.error:
@@ -58,41 +58,43 @@ class TranslationResult:
 
 class GoogleTranslator:
     """Wrapper cho Google Translate với fallback strategy"""
-    
+
     @staticmethod
-    def translate(text: str, source_lang: str = "auto", target_lang: str = "vi") -> Dict[str, Any]:
+    def translate(
+        text: str, source_lang: str = "auto", target_lang: str = "vi"
+    ) -> Dict[str, Any]:
         """
         Dịch văn bản sử dụng Google Translate
-        
+
         Args:
             text: Văn bản cần dịch
             source_lang: Ngôn ngữ nguồn (mặc định: auto)
             target_lang: Ngôn ngữ đích (mặc định: vi)
-            
+
         Returns:
             Dict chứa kết quả dịch
         """
         # Thử deep-translator trước
         try:
             from deep_translator import GoogleTranslator as DeepGoogleTranslator
-            
+
             translator = DeepGoogleTranslator(source=source_lang, target=target_lang)
             result = translator.translate(text)
             logger.info(f"✓ Translated with deep-translator: {text[:30]}...")
             return {"success": True, "translated": result}
-            
+
         except ImportError:
             logger.warning("deep-translator not installed, trying googletrans...")
-            
+
         # Fallback sang googletrans
         try:
             from googletrans import Translator
-            
+
             translator = Translator()
             result = translator.translate(text, src=source_lang, dest=target_lang)
             logger.info(f"✓ Translated with googletrans: {text[:30]}...")
             return {"success": True, "translated": result.text}
-            
+
         except Exception as e:
             logger.error(f"✗ Translation failed: {e}")
             return {"success": False, "error": f"Lỗi dịch: {str(e)}"}
@@ -101,16 +103,16 @@ class GoogleTranslator:
 class VocabularyAIHelper:
     """
     SDK chính cho AI Helper - Tự động điền thông tin từ vựng
-    
+
     Sử dụng:
         helper = VocabularyAIHelper()
         result = helper.get_vocabulary_info(chinese="你好")
     """
-    
+
     def __init__(self, api_key: Optional[str] = None, model: str = "gpt-3.5-turbo"):
         """
         Khởi tạo AI Helper
-        
+
         Args:
             api_key: OpenAI API key (optional, mặc định lấy từ env)
             model: Model AI sử dụng (mặc định: gpt-3.5-turbo)
@@ -119,7 +121,7 @@ class VocabularyAIHelper:
         self.model = model
         self._client: Optional[OpenAI] = None
         self.google_translator = GoogleTranslator()
-        
+
     @property
     def client(self) -> Optional[OpenAI]:
         """Lazy initialization của OpenAI client"""
@@ -130,22 +132,20 @@ class VocabularyAIHelper:
             except Exception as e:
                 logger.error(f"✗ Failed to initialize OpenAI client: {e}")
         return self._client
-    
+
     def get_vocabulary_info(
-        self, 
-        chinese: Optional[str] = None, 
-        vietnamese: Optional[str] = None
+        self, chinese: Optional[str] = None, vietnamese: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Tự động điền thông tin từ vựng bằng AI
-        
+
         Args:
             chinese: Từ tiếng Trung (nếu có)
             vietnamese: Nghĩa tiếng Việt (nếu có)
-            
+
         Returns:
             Dict chứa kết quả với data từ vựng
-            
+
         Examples:
             >>> helper = VocabularyAIHelper()
             >>> result = helper.get_vocabulary_info(chinese="你好")
@@ -156,31 +156,31 @@ class VocabularyAIHelper:
         if not self.client:
             logger.warning("OpenAI not available, using Google Translate")
             return self._use_google_fallback(chinese, vietnamese)
-        
+
         try:
             # Tạo prompt dựa trên input
             prompt = self._build_prompt(chinese, vietnamese)
-            
+
             logger.info(f"→ Getting vocabulary info for: {chinese or vietnamese}")
-            
+
             # Gọi OpenAI API
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
                     {
                         "role": "system",
-                        "content": "Bạn là trợ lý dạy tiếng Trung chuyên nghiệp. Luôn trả về JSON đúng format."
+                        "content": "Bạn là trợ lý dạy tiếng Trung chuyên nghiệp. Luôn trả về JSON đúng format.",
                     },
-                    {"role": "user", "content": prompt}
+                    {"role": "user", "content": prompt},
                 ],
                 temperature=0.3,
-                max_tokens=500
+                max_tokens=500,
             )
-            
+
             # Parse kết quả
             result_text = response.choices[0].message.content.strip()
             vocab_info = self._parse_ai_response(result_text)
-            
+
             # Xây dựng kết quả
             result = TranslationResult(
                 success=True,
@@ -189,21 +189,21 @@ class VocabularyAIHelper:
                     chinese=vocab_info.get("chinese", chinese or ""),
                     pinyin=vocab_info.get("pinyin", ""),
                     vietnamese=vocab_info.get("vietnamese", vietnamese or ""),
-                    example_sentence=vocab_info.get("example", "")
-                )
+                    example_sentence=vocab_info.get("example", ""),
+                ),
             )
-            
+
             logger.info(f"✓ AI vocabulary info retrieved successfully")
             return result.to_dict()
-            
+
         except json.JSONDecodeError as e:
             logger.error(f"✗ AI JSON parsing error, fallback to Google: {e}")
             return self._use_google_fallback(chinese, vietnamese)
-            
+
         except Exception as e:
             logger.error(f"✗ AI error, fallback to Google: {e}")
             return self._use_google_fallback(chinese, vietnamese)
-    
+
     def _build_prompt(self, chinese: Optional[str], vietnamese: Optional[str]) -> str:
         """Xây dựng prompt cho AI"""
         base_format = """
@@ -223,14 +223,14 @@ Lưu ý:
 
 Chỉ trả về JSON, không thêm text nào khác.
 """
-        
+
         if chinese:
             return f"""Bạn là trợ lý dạy tiếng Trung. Hãy cung cấp thông tin về từ tiếng Trung: "{chinese}"
 {base_format}"""
         else:
             return f"""Bạn là trợ lý dạy tiếng Trung. Hãy tìm từ tiếng Trung tương ứng với nghĩa tiếng Việt: "{vietnamese}"
 {base_format}"""
-    
+
     def _parse_ai_response(self, text: str) -> Dict[str, str]:
         """Parse response từ AI, xử lý markdown code blocks"""
         # Loại bỏ markdown code blocks nếu có
@@ -239,22 +239,20 @@ Chỉ trả về JSON, không thêm text nào khác.
             if text.startswith("json"):
                 text = text[4:]
             text = text.strip()
-        
+
         # Parse JSON
         return json.loads(text)
-    
+
     def _use_google_fallback(
-        self, 
-        chinese: Optional[str], 
-        vietnamese: Optional[str]
+        self, chinese: Optional[str], vietnamese: Optional[str]
     ) -> Dict[str, Any]:
         """
         Fallback sử dụng Google Translate khi AI không hoạt động
-        
+
         Args:
             chinese: Từ tiếng Trung
             vietnamese: Nghĩa tiếng Việt
-            
+
         Returns:
             Dict chứa kết quả dịch từ Google
         """
@@ -264,7 +262,7 @@ Chỉ trả về JSON, không thêm text nào khác.
                 result = self.google_translator.translate(
                     chinese, source_lang="zh-CN", target_lang="vi"
                 )
-                
+
                 if result["success"]:
                     return TranslationResult(
                         success=True,
@@ -273,16 +271,16 @@ Chỉ trả về JSON, không thêm text nào khác.
                             chinese=chinese,
                             pinyin="",  # Google không cung cấp pinyin
                             vietnamese=result["translated"],
-                            example_sentence=f'{chinese} - {result["translated"]}'
-                        )
+                            example_sentence=f'{chinese} - {result["translated"]}',
+                        ),
                     ).to_dict()
-            
+
             elif vietnamese:
                 # Dịch từ tiếng Việt sang tiếng Trung
                 result = self.google_translator.translate(
                     vietnamese, source_lang="vi", target_lang="zh-CN"
                 )
-                
+
                 if result["success"]:
                     return TranslationResult(
                         success=True,
@@ -291,29 +289,30 @@ Chỉ trả về JSON, không thêm text nào khác.
                             chinese=result["translated"],
                             pinyin="",  # Google không cung cấp pinyin
                             vietnamese=vietnamese,
-                            example_sentence=f'{result["translated"]} - {vietnamese}'
-                        )
+                            example_sentence=f'{result["translated"]} - {vietnamese}',
+                        ),
                     ).to_dict()
-            
+
             # Nếu không thành công
             return TranslationResult(
                 success=False,
                 method=TranslationMethod.GOOGLE.value,
-                error="Không thể dịch với Google Translate"
+                error="Không thể dịch với Google Translate",
             ).to_dict()
-            
+
         except Exception as e:
             logger.error(f"✗ Google Translate error: {e}")
             return TranslationResult(
                 success=False,
                 method=TranslationMethod.GOOGLE.value,
-                error=f"Lỗi Google Translate: {str(e)}"
+                error=f"Lỗi Google Translate: {str(e)}",
             ).to_dict()
 
 
 # ============================================
 # Backward compatibility với code cũ
 # ============================================
+
 
 def translate_with_google(text, source_lang="auto", target_lang="vi"):
     """[Deprecated] Sử dụng GoogleTranslator.translate thay thế"""

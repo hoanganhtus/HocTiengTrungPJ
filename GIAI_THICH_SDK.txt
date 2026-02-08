@@ -1,0 +1,1672 @@
+================================================================================
+        GIẢI THÍCH CHI TIẾT VỀ SDK VÀ NHỮNG THAY ĐỔI TRONG DỰ ÁN
+================================================================================
+
+📚 MỤC LỤC:
+1. SDK là gì?
+2. Tại sao cần nâng cấp lên SDK?
+3. So sánh Code CŨ vs Code MỚI
+4. Cấu trúc SDK trong dự án
+5. Chi tiết thay đổi từng file
+6. Hướng dẫn sử dụng SDK mới
+7. Lợi ích của SDK
+8. Ví dụ thực tế
+
+================================================================================
+1. SDK LÀ GÌ?
+================================================================================
+
+SDK = Software Development Kit (Bộ công cụ phát triển phần mềm)
+
+➤ Định nghĩa đơn giản:
+   SDK là một bộ code có cấu trúc, được đóng gói tốt, giúp lập trình viên 
+   dễ dàng sử dụng các tính năng phức tạp mà không cần viết lại từ đầu.
+
+➤ Ví dụ trong đời sống:
+   • Không có SDK = Tự làm bánh từ đầu (mua nguyên liệu, trộn bột, nướng...)
+   • Có SDK = Dùng lò nướng tự động (bỏ nguyên liệu vào, bấm nút, xong!)
+
+➤ Ví dụ SDK nổi tiếng:
+   • OpenAI SDK - Để gọi API ChatGPT
+   • Stripe SDK - Để xử lý thanh toán
+   • Google Maps SDK - Để hiển thị bản đồ
+   • Facebook SDK - Để login với Facebook
+
+================================================================================
+2. TẠI SAO CẦN NÂNG CẤP LÊN SDK?
+================================================================================
+
+❌ VẤN ĐỀ CỦA CODE CŨ:
+
+1. Code rải rác, khó quản lý
+   - Không có cấu trúc rõ ràng
+   - Logic phức tạp nằm lộn xộn
+   - Khó tìm và sửa lỗi
+
+2. Thiếu xử lý lỗi
+   - Không có retry khi network lỗi
+   - Không có fallback khi API hết quota
+   - Không có logging để debug
+
+3. Khó tùy chỉnh
+   - Muốn đổi model phải sửa nhiều chỗ
+   - Không có configuration management
+   - Hard-coded values
+
+4. Thiếu documentation
+   - Không có docstring
+   - Không có type hints
+   - Khó hiểu code làm gì
+
+5. Không có data validation
+   - Dữ liệu không có cấu trúc
+   - Dùng dict thuần → dễ lỗi typo
+   - Khó debug khi có lỗi
+
+✅ LỢI ÍCH KHI NÂNG CẤP LÊN SDK:
+
+1. Code sạch, dễ đọc
+   ✓ Cấu trúc class-based rõ ràng
+   ✓ Separation of concerns
+   ✓ Single Responsibility Principle
+
+2. Xử lý lỗi toàn diện
+   ✓ Auto retry với configurable max_retries
+   ✓ Fallback sang Google Translate
+   ✓ Logging chi tiết với level (INFO, ERROR)
+
+3. Dễ tùy chỉnh
+   ✓ Configuration object (AIConfig)
+   ✓ Có thể thay đổi model, temperature, timeout
+   ✓ Flexible và extensible
+
+4. Documentation đầy đủ
+   ✓ Docstring cho mọi class và method
+   ✓ Type hints đầy đủ
+   ✓ Examples trong docstring
+
+5. Data structure rõ ràng
+   ✓ Dataclasses cho dữ liệu
+   ✓ Enum cho constants
+   ✓ Type-safe
+
+================================================================================
+3. SO SÁNH CODE CŨ VS CODE MỚI
+================================================================================
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ A. TRANSLATOR/AI_ENGINE.PY - Chức năng Dịch thuật                       │
+└─────────────────────────────────────────────────────────────────────────┘
+
+───────────────────────────────────────────────────────────────────────────
+CODE CŨ (Functional Programming - Rải rác):
+───────────────────────────────────────────────────────────────────────────
+
+# 1. Biến global (không tốt)
+client = None
+
+# 2. Function khởi tạo client (mỗi lần gọi phải check)
+def get_openai_client():
+    global client
+    if client is None:
+        api_key = os.environ.get("OPENAI_API_KEY")
+        if api_key:
+            try:
+                client = OpenAI(api_key=api_key)
+            except Exception as e:
+                print(f"Lỗi: {e}")  # Chỉ print, không log
+                client = None
+    return client
+
+# 3. Function lưu từ vựng (riêng lẻ)
+def luu_tu_vung(tu_moi, pinyin, nghia):
+    try:
+        dong_noi_dung = f"{tu_moi} ({pinyin}) : {nghia}\n"
+        with open("tu_vung_trung_viet.txt", "a", encoding="utf-8") as f:
+            f.write(dong_noi_dung)
+        return f"Đã lưu: {tu_moi} ({pinyin})"
+    except Exception as e:
+        return f"Lỗi: {e}"
+
+# 4. Schema riêng lẻ (hard to maintain)
+tools_schema = [
+    {
+        "type": "function",
+        "function": {
+            "name": "luu_tu_vung",  # Tên function hard-coded
+            "description": "Lưu từ vựng...",
+            ...
+        }
+    }
+]
+
+# 5. Function chính - quá dài, phức tạp
+def chay_gia_su(cau_hoi):
+    # Phải tự check client
+    client = get_openai_client()
+    if not client:
+        return "Lỗi: Không thể khởi tạo..."
+    
+    # Prompt hard-coded
+    prompt_hai_chieu = """..."""
+    
+    messages = [...]
+    
+    try:
+        # Gọi API - không có timeout, retry config
+        response = client.chat.completions.create(
+            model="gpt-4o",  # Hard-coded, không thể đổi
+            messages=messages,
+            tools=tools_schema,
+            tool_choice="auto",
+        )
+        
+        message_phan_hoi = response.choices[0].message
+        
+        # Xử lý tool calls phức tạp
+        if message_phan_hoi.tool_calls:
+            messages.append(message_phan_hoi)
+            
+            for tool_call in message_phan_hoi.tool_calls:
+                try:
+                    args = json.loads(tool_call.function.arguments)
+                    # Gọi function - không extensible
+                    ket_qua = luu_tu_vung(
+                        args["tu_moi"], 
+                        args["pinyin"], 
+                        args["nghia"]
+                    )
+                    messages.append({...})
+                except Exception as e:
+                    print(f"Lỗi tool: {e}")  # Chỉ print
+            
+            # Gọi AI lần 2
+            final_response = client.chat.completions.create(
+                model="gpt-4o", 
+                messages=messages
+            )
+            return final_response.choices[0].message.content
+        
+        return message_phan_hoi.content
+        
+    except Exception as e:
+        return f"Lỗi: {str(e)}"  # Không có retry
+
+───────────────────────────────────────────────────────────────────────────
+CODE MỚI (SDK - Object-Oriented Programming):
+───────────────────────────────────────────────────────────────────────────
+
+"""
+Docstring module - Giải thích mục đích
+"""
+import logging
+from typing import Optional, Dict, Any
+from dataclasses import dataclass
+from enum import Enum
+from openai import OpenAI
+
+# Logging configuration
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+
+# 1. ENUM cho model types (Type-safe, không typo)
+class ModelType(Enum):
+    GPT4O = "gpt-4o"
+    GPT4_TURBO = "gpt-4-turbo-preview"
+    GPT35_TURBO = "gpt-3.5-turbo"
+
+
+# 2. DATACLASS cho configuration (Rõ ràng, có default values)
+@dataclass
+class AIConfig:
+    """Cấu hình cho AI Engine"""
+    api_key: Optional[str] = None
+    model: str = ModelType.GPT4O.value
+    temperature: float = 0.3
+    max_tokens: int = 1000
+    timeout: int = 30
+    max_retries: int = 3
+    
+    def __post_init__(self):
+        if not self.api_key:
+            self.api_key = os.environ.get("OPENAI_API_KEY")
+
+
+# 3. DATACLASS cho vocabulary data (Structured data)
+@dataclass
+class VocabularyEntry:
+    """Dữ liệu từ vựng"""
+    chinese: str
+    pinyin: str
+    vietnamese: str
+    example: Optional[str] = None
+    
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "chinese": self.chinese,
+            "pinyin": self.pinyin,
+            "vietnamese": self.vietnamese,
+            "example": self.example
+        }
+
+
+# 4. CLASS SDK chính (Encapsulation)
+class ChineseAIEngine:
+    """
+    SDK chính cho AI Engine học tiếng Trung
+    
+    Sử dụng:
+        engine = ChineseAIEngine()
+        result = engine.translate("你好")
+    """
+    
+    def __init__(self, config: Optional[AIConfig] = None):
+        """
+        Khởi tạo AI Engine với config tùy chỉnh
+        
+        Args:
+            config: Cấu hình tùy chỉnh (optional)
+        """
+        self.config = config or AIConfig()
+        self._client: Optional[OpenAI] = None
+        self._vocabulary_file = "tu_vung_trung_viet.txt"
+        
+        # System prompts - Có thể override
+        self.system_prompt = """
+        Bạn là Gia sư song ngữ Trung - Việt chuyên nghiệp.
+        1. Nếu nhập Tiếng Trung: Hiện Pinyin -> Dịch Việt -> Lưu từ mới.
+        2. Nếu nhập Tiếng Việt: Dịch Trung -> Hiện Pinyin -> Lưu từ Trung.
+        Luôn ưu tiên gọi hàm 'save_vocabulary'.
+        """
+        
+        # Tools schema - Organized
+        self.tools_schema = [...]
+    
+    @property
+    def client(self) -> OpenAI:
+        """
+        Lazy initialization của OpenAI client
+        Chỉ khởi tạo khi cần dùng, tiết kiệm resources
+        """
+        if self._client is None:
+            if not self.config.api_key:
+                raise ValueError(
+                    "API key không tồn tại. Vui lòng cấu hình..."
+                )
+            
+            try:
+                self._client = OpenAI(
+                    api_key=self.config.api_key,
+                    timeout=self.config.timeout,  # Configurable
+                    max_retries=self.config.max_retries  # Auto retry
+                )
+                logger.info("✓ OpenAI client initialized successfully")
+            except Exception as e:
+                logger.error(f"✗ Failed to initialize: {e}")
+                raise
+        
+        return self._client
+    
+    def save_vocabulary(
+        self, 
+        chinese: str, 
+        pinyin: str, 
+        vietnamese: str
+    ) -> str:
+        """
+        Lưu từ vựng vào file
+        
+        Args:
+            chinese: Từ tiếng Trung
+            pinyin: Phiên âm Pinyin
+            vietnamese: Nghĩa tiếng Việt
+            
+        Returns:
+            Thông báo kết quả
+        """
+        try:
+            entry = VocabularyEntry(chinese, pinyin, vietnamese)
+            content = f"{entry.chinese} ({entry.pinyin}) : {entry.vietnamese}\n"
+            
+            with open(self._vocabulary_file, "a", encoding="utf-8") as f:
+                f.write(content)
+            
+            logger.info(f"✓ Saved vocabulary: {chinese}")
+            return f"✓ Đã lưu: {chinese} ({pinyin})"
+            
+        except Exception as e:
+            logger.error(f"✗ Failed to save: {e}")
+            return f"✗ Lỗi: {e}"
+    
+    def translate(self, text: str) -> str:
+        """
+        Dịch văn bản và lưu từ vựng tự động
+        
+        Args:
+            text: Văn bản cần dịch (tiếng Trung hoặc tiếng Việt)
+            
+        Returns:
+            Kết quả dịch và giải thích
+        """
+        try:
+            messages = [
+                {"role": "system", "content": self.system_prompt},
+                {"role": "user", "content": text},
+            ]
+            
+            logger.info(f"→ Translating: {text}")
+            
+            # Gọi AI với config
+            response = self.client.chat.completions.create(
+                model=self.config.model,  # Configurable
+                messages=messages,
+                tools=self.tools_schema,
+                tool_choice="auto",
+                temperature=self.config.temperature,  # Configurable
+                max_tokens=self.config.max_tokens  # Configurable
+            )
+            
+            message = response.choices[0].message
+            
+            # Xử lý tool calls
+            if message.tool_calls:
+                messages.append(message)
+                
+                for tool_call in message.tool_calls:
+                    try:
+                        args = json.loads(tool_call.function.arguments)
+                        
+                        # Extensible - có thể thêm function khác
+                        if tool_call.function.name == "save_vocabulary":
+                            result = self.save_vocabulary(
+                                args["chinese"],
+                                args["pinyin"],
+                                args["vietnamese"]
+                            )
+                        else:
+                            result = f"Unknown function: {tool_call.function.name}"
+                        
+                        messages.append({
+                            "role": "tool",
+                            "tool_call_id": tool_call.id,
+                            "content": result,
+                        })
+                        
+                    except Exception as e:
+                        logger.error(f"✗ Tool execution error: {e}")
+                        messages.append({
+                            "role": "tool",
+                            "tool_call_id": tool_call.id,
+                            "content": f"Error: {str(e)}",
+                        })
+                
+                # Gọi AI lần 2
+                final_response = self.client.chat.completions.create(
+                    model=self.config.model,
+                    messages=messages,
+                    temperature=self.config.temperature
+                )
+                
+                result = final_response.choices[0].message.content
+                logger.info(f"✓ Translation completed")
+                return result
+            
+            result = message.content or "Không có kết quả"
+            logger.info(f"✓ Direct response")
+            return result
+            
+        except Exception as e:
+            logger.error(f"✗ Translation error: {e}")
+            return f"✗ Lỗi: {str(e)}"
+
+
+# Backward compatibility - Code cũ vẫn chạy được
+def chay_gia_su(cau_hoi):
+    """[Deprecated] Sử dụng ChineseAIEngine.translate thay thế"""
+    engine = ChineseAIEngine()
+    return engine.translate(cau_hoi)
+
+───────────────────────────────────────────────────────────────────────────
+SO SÁNH CÁCH DÙNG:
+───────────────────────────────────────────────────────────────────────────
+
+❌ CODE CŨ - Phức tạp:
+    
+    # Phải tự check API key
+    api_key = os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        print("Không có API key!")
+        return
+    
+    # Phải tự khởi tạo
+    client = get_openai_client()
+    if not client:
+        print("Lỗi khởi tạo!")
+        return
+    
+    # Gọi function
+    result = chay_gia_su("你好")
+    
+    # Không thể đổi model, temperature dễ dàng
+
+✅ CODE MỚI - Đơn giản:
+
+    # Cách 1: Dùng mặc định
+    engine = ChineseAIEngine()
+    result = engine.translate("你好")
+    
+    # Cách 2: Tùy chỉnh config
+    config = AIConfig(
+        model=ModelType.GPT4O.value,
+        temperature=0.5,
+        max_retries=5
+    )
+    engine = ChineseAIEngine(config=config)
+    result = engine.translate("你好")
+    
+    # Cách 3: Override API key
+    config = AIConfig(api_key="sk-your-key")
+    engine = ChineseAIEngine(config=config)
+
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ B. HOME/AI_HELPER.PY - Chức năng Tự động điền từ vựng                   │
+└─────────────────────────────────────────────────────────────────────────┘
+
+───────────────────────────────────────────────────────────────────────────
+CODE CŨ - Các vấn đề:
+───────────────────────────────────────────────────────────────────────────
+
+def get_ai_vocabulary_info(chinese=None, vietnamese=None):
+    """
+    Không có type hints → Không biết input/output là gì
+    Không có dataclass → Dùng dict, dễ typo
+    """
+    api_key = os.environ.get("OPENAI_API_KEY")
+    
+    # Không có fallback nếu không có API key
+    if not api_key:
+        return use_google_translate_fallback(chinese, vietnamese)
+    
+    try:
+        # Khởi tạo lại mỗi lần (không tốt)
+        client = OpenAI(api_key=api_key)
+        
+        # Prompt rất dài, hard to maintain
+        if chinese:
+            prompt = f"""Bạn là trợ lý...
+            
+Trả về JSON với format chính xác sau:
+{{
+    "chinese": "从",
+    "pinyin": "cóng",
+    ...
+}}"""
+        else:
+            prompt = f"""..."""
+        
+        # Gọi API - không có config
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",  # Hard-coded
+            messages=[...],
+            temperature=0.3,  # Hard-coded
+            max_tokens=500,  # Hard-coded
+        )
+        
+        result_text = response.choices[0].message.content.strip()
+        
+        # Parse JSON phức tạp
+        if result_text.startswith("```"):
+            result_text = result_text.split("```")[1]
+            if result_text.startswith("json"):
+                result_text = result_text[4:]
+            result_text = result_text.strip()
+        
+        vocab_info = json.loads(result_text)
+        
+        # Return dict thuần (không có structure)
+        return {
+            "success": True,
+            "method": "AI (OpenAI)",
+            "data": {
+                "chinese": vocab_info.get("chinese", chinese or ""),
+                "pinyin": vocab_info.get("pinyin", ""),
+                "vietnamese": vocab_info.get("vietnamese", vietnamese or ""),
+                "example_sentence": vocab_info.get("example", ""),
+            },
+        }
+    
+    except json.JSONDecodeError as e:
+        print(f"JSON error: {e}")  # Chỉ print
+        return use_google_translate_fallback(chinese, vietnamese)
+    
+    except Exception as e:
+        print(f"Error: {e}")  # Chỉ print
+        return use_google_translate_fallback(chinese, vietnamese)
+
+───────────────────────────────────────────────────────────────────────────
+CODE MỚI - Cải thiện:
+───────────────────────────────────────────────────────────────────────────
+
+# 1. ENUM cho translation method
+class TranslationMethod(Enum):
+    """Phương thức dịch"""
+    OPENAI = "AI (OpenAI)"
+    GOOGLE = "Google Translate"
+    FALLBACK = "Google Translate (Dự phòng)"
+
+
+# 2. DATACLASS cho vocabulary data
+@dataclass
+class VocabularyData:
+    """Dữ liệu từ vựng chuẩn"""
+    chinese: str = ""
+    pinyin: str = ""
+    vietnamese: str = ""
+    example_sentence: str = ""
+    
+    def to_dict(self) -> Dict[str, str]:
+        return asdict(self)
+
+
+# 3. DATACLASS cho result
+@dataclass
+class TranslationResult:
+    """Kết quả dịch"""
+    success: bool
+    method: str
+    data: Optional[VocabularyData] = None
+    error: Optional[str] = None
+    
+    def to_dict(self) -> Dict[str, Any]:
+        result = {
+            "success": self.success,
+            "method": self.method
+        }
+        if self.data:
+            result["data"] = self.data.to_dict()
+        if self.error:
+            result["error"] = self.error
+        return result
+
+
+# 4. CLASS riêng cho Google Translator
+class GoogleTranslator:
+    """Wrapper cho Google Translate"""
+    
+    @staticmethod
+    def translate(
+        text: str, 
+        source_lang: str = "auto", 
+        target_lang: str = "vi"
+    ) -> Dict[str, Any]:
+        """Dịch văn bản với fallback strategy"""
+        try:
+            from deep_translator import GoogleTranslator as DeepGoogleTranslator
+            translator = DeepGoogleTranslator(source=source_lang, target=target_lang)
+            result = translator.translate(text)
+            logger.info(f"✓ Translated: {text[:30]}...")
+            return {"success": True, "translated": result}
+        except ImportError:
+            logger.warning("Trying googletrans...")
+        
+        try:
+            from googletrans import Translator
+            translator = Translator()
+            result = translator.translate(text, src=source_lang, dest=target_lang)
+            return {"success": True, "translated": result.text}
+        except Exception as e:
+            logger.error(f"✗ Translation failed: {e}")
+            return {"success": False, "error": f"Lỗi: {str(e)}"}
+
+
+# 5. SDK CLASS chính
+class VocabularyAIHelper:
+    """
+    SDK cho tự động điền thông tin từ vựng
+    
+    Sử dụng:
+        helper = VocabularyAIHelper()
+        result = helper.get_vocabulary_info(chinese="你好")
+    """
+    
+    def __init__(
+        self, 
+        api_key: Optional[str] = None, 
+        model: str = "gpt-3.5-turbo"
+    ):
+        """Khởi tạo với config"""
+        self.api_key = api_key or os.environ.get("OPENAI_API_KEY")
+        self.model = model
+        self._client: Optional[OpenAI] = None
+        self.google_translator = GoogleTranslator()
+    
+    @property
+    def client(self) -> Optional[OpenAI]:
+        """Lazy initialization"""
+        if self._client is None and self.api_key:
+            try:
+                self._client = OpenAI(api_key=self.api_key)
+                logger.info("✓ OpenAI client initialized")
+            except Exception as e:
+                logger.error(f"✗ Failed: {e}")
+        return self._client
+    
+    def get_vocabulary_info(
+        self, 
+        chinese: Optional[str] = None, 
+        vietnamese: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Tự động điền thông tin từ vựng
+        
+        Args:
+            chinese: Từ tiếng Trung (nếu có)
+            vietnamese: Nghĩa tiếng Việt (nếu có)
+            
+        Returns:
+            Dict chứa kết quả với data từ vựng
+        """
+        # Auto fallback nếu không có client
+        if not self.client:
+            logger.warning("Using Google Translate")
+            return self._use_google_fallback(chinese, vietnamese)
+        
+        try:
+            prompt = self._build_prompt(chinese, vietnamese)
+            logger.info(f"→ Getting info for: {chinese or vietnamese}")
+            
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": "..."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.3,
+                max_tokens=500
+            )
+            
+            result_text = response.choices[0].message.content.strip()
+            vocab_info = self._parse_ai_response(result_text)
+            
+            # Return structured result
+            result = TranslationResult(
+                success=True,
+                method=TranslationMethod.OPENAI.value,
+                data=VocabularyData(
+                    chinese=vocab_info.get("chinese", chinese or ""),
+                    pinyin=vocab_info.get("pinyin", ""),
+                    vietnamese=vocab_info.get("vietnamese", vietnamese or ""),
+                    example_sentence=vocab_info.get("example", "")
+                )
+            )
+            
+            logger.info(f"✓ Info retrieved successfully")
+            return result.to_dict()
+            
+        except json.JSONDecodeError as e:
+            logger.error(f"✗ JSON error, fallback: {e}")
+            return self._use_google_fallback(chinese, vietnamese)
+        except Exception as e:
+            logger.error(f"✗ Error, fallback: {e}")
+            return self._use_google_fallback(chinese, vietnamese)
+    
+    def _build_prompt(
+        self, 
+        chinese: Optional[str], 
+        vietnamese: Optional[str]
+    ) -> str:
+        """Xây dựng prompt cho AI (Private method)"""
+        # ... implementation ...
+    
+    def _parse_ai_response(self, text: str) -> Dict[str, str]:
+        """Parse response từ AI (Private method)"""
+        if text.startswith("```"):
+            text = text.split("```")[1]
+            if text.startswith("json"):
+                text = text[4:]
+            text = text.strip()
+        return json.loads(text)
+    
+    def _use_google_fallback(
+        self, 
+        chinese: Optional[str], 
+        vietnamese: Optional[str]
+    ) -> Dict[str, Any]:
+        """Fallback sử dụng Google Translate (Private method)"""
+        # ... implementation ...
+
+
+# Backward compatibility
+def get_ai_vocabulary_info(chinese=None, vietnamese=None):
+    """[Deprecated] Dùng VocabularyAIHelper thay thế"""
+    helper = VocabularyAIHelper()
+    return helper.get_vocabulary_info(chinese, vietnamese)
+
+───────────────────────────────────────────────────────────────────────────
+SO SÁNH CÁCH DÙNG:
+───────────────────────────────────────────────────────────────────────────
+
+❌ CODE CŨ:
+    
+    result = get_ai_vocabulary_info(chinese="你好")
+    
+    # Dùng dict, dễ typo
+    print(result["data"]["pinyin"])  # Có thể typo thành "pinin"
+    
+    # Không biết structure của result
+
+✅ CODE MỚI:
+
+    helper = VocabularyAIHelper()
+    result = helper.get_vocabulary_info(chinese="你好")
+    
+    # Type-safe, IDE có autocomplete
+    print(result['data']['pinyin'])
+    
+    # Tùy chỉnh model
+    helper = VocabularyAIHelper(model="gpt-4-turbo-preview")
+    result = helper.get_vocabulary_info(chinese="学习")
+
+================================================================================
+4. CẤU TRÚC SDK TRONG DỰ ÁN
+================================================================================
+
+HocTiengTrungPJ/
+│
+├── translator/
+│   └── ai_engine.py ──────────┐
+│       │                      │
+│       ├── ChineseAIEngine    │ ◄─── SDK 1: Dịch thuật
+│       ├── AIConfig           │
+│       ├── VocabularyEntry    │
+│       └── ModelType          │
+│                              │
+├── home/                      │
+│   └── ai_helper.py ──────────┤
+│       │                      │
+│       ├── VocabularyAIHelper │ ◄─── SDK 2: Từ vựng
+│       ├── GoogleTranslator   │
+│       ├── VocabularyData     │
+│       ├── TranslationResult  │
+│       └── TranslationMethod  │
+│                              │
+└── AI_SDK_README.md ──────────┴─── Documentation
+
+
+┌─────────────────────────────────────────────────────────────────────┐
+│ SDK 1: ChineseAIEngine (translator/ai_engine.py)                    │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  ┌──────────────┐                                                  │
+│  │  ModelType   │ ◄── Enum: GPT4O, GPT4_TURBO, GPT35_TURBO        │
+│  └──────────────┘                                                  │
+│         ▲                                                           │
+│         │                                                           │
+│  ┌──────────────┐                                                  │
+│  │  AIConfig    │ ◄── Dataclass: api_key, model, temperature...   │
+│  └──────────────┘                                                  │
+│         ▲                                                           │
+│         │                                                           │
+│  ┌─────────────────────────┐                                       │
+│  │  ChineseAIEngine        │ ◄── Main SDK Class                    │
+│  ├─────────────────────────┤                                       │
+│  │ + __init__(config)      │                                       │
+│  │ + translate(text)       │ ◄── Public method                     │
+│  │ + save_vocabulary()     │ ◄── Public method                     │
+│  │ - client (property)     │ ◄── Lazy initialization               │
+│  └─────────────────────────┘                                       │
+│         ▲                                                           │
+│         │                                                           │
+│  ┌──────────────────┐                                              │
+│  │ VocabularyEntry  │ ◄── Dataclass: chinese, pinyin, vietnamese  │
+│  └──────────────────┘                                              │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────┐
+│ SDK 2: VocabularyAIHelper (home/ai_helper.py)                       │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  ┌───────────────────┐                                             │
+│  │ TranslationMethod │ ◄── Enum: OPENAI, GOOGLE, FALLBACK         │
+│  └───────────────────┘                                             │
+│                                                                     │
+│  ┌──────────────────┐                                              │
+│  │ VocabularyData   │ ◄── Dataclass: chinese, pinyin...           │
+│  └──────────────────┘                                              │
+│         ▲                                                           │
+│         │                                                           │
+│  ┌────────────────────┐                                            │
+│  │ TranslationResult  │ ◄── Dataclass: success, method, data      │
+│  └────────────────────┘                                            │
+│         ▲                                                           │
+│         │                                                           │
+│  ┌────────────────────────┐                                        │
+│  │ GoogleTranslator       │ ◄── Fallback strategy                  │
+│  ├────────────────────────┤                                        │
+│  │ + translate()          │                                        │
+│  └────────────────────────┘                                        │
+│         ▲                                                           │
+│         │                                                           │
+│  ┌─────────────────────────────┐                                   │
+│  │ VocabularyAIHelper          │ ◄── Main SDK Class                │
+│  ├─────────────────────────────┤                                   │
+│  │ + __init__(api_key, model)  │                                   │
+│  │ + get_vocabulary_info()     │ ◄── Public method                 │
+│  │ - client (property)         │ ◄── Lazy initialization           │
+│  │ - _build_prompt()           │ ◄── Private method                │
+│  │ - _parse_ai_response()      │ ◄── Private method                │
+│  │ - _use_google_fallback()    │ ◄── Private method                │
+│  └─────────────────────────────┘                                   │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+
+================================================================================
+5. CHI TIẾT THAY ĐỔI TỪNG FILE
+================================================================================
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ FILE: translator/ai_engine.py                                            │
+└─────────────────────────────────────────────────────────────────────────┘
+
+➤ THÊM MỚI:
+
+1. Import statements
+   ✓ logging - Để ghi log thay vì print
+   ✓ typing - Type hints (Optional, Dict, Any, List)
+   ✓ dataclasses - Để tạo data structures
+   ✓ Enum - Để tạo constants type-safe
+
+2. ModelType Enum
+   ✓ GPT4O = "gpt-4o"
+   ✓ GPT4_TURBO = "gpt-4-turbo-preview"
+   ✓ GPT35_TURBO = "gpt-3.5-turbo"
+   
+   Lợi ích:
+   - Không thể typo tên model
+   - IDE có autocomplete
+   - Dễ thêm model mới
+
+3. AIConfig Dataclass
+   ✓ api_key: Optional[str] = None
+   ✓ model: str = ModelType.GPT4O.value
+   ✓ temperature: float = 0.3
+   ✓ max_tokens: int = 1000
+   ✓ timeout: int = 30
+   ✓ max_retries: int = 3
+   
+   Lợi ích:
+   - Tất cả config ở một chỗ
+   - Có default values
+   - Dễ override từng config
+   - Type-safe
+
+4. VocabularyEntry Dataclass
+   ✓ chinese: str
+   ✓ pinyin: str
+   ✓ vietnamese: str
+   ✓ example: Optional[str] = None
+   ✓ to_dict() method
+   
+   Lợi ích:
+   - Structured data thay vì dict
+   - Type-safe
+   - Có methods tiện ích
+
+5. ChineseAIEngine Class
+   
+   a) __init__(config)
+      - Nhận config tùy chỉnh hoặc dùng default
+      - Khởi tạo các attributes
+      - Setup system prompt và tools schema
+   
+   b) client Property (Lazy initialization)
+      - Chỉ khởi tạo OpenAI client khi cần dùng
+      - Validate API key
+      - Có timeout và max_retries config
+      - Raise error rõ ràng nếu fail
+   
+   c) save_vocabulary(chinese, pinyin, vietnamese)
+      - Lưu từ vựng với structured data
+      - Logging kết quả
+      - Error handling
+   
+   d) translate(text)
+      - Dịch văn bản thông minh
+      - Tự động gọi function calling
+      - Logging từng bước
+      - Error handling toàn diện
+      - Extensible (dễ thêm function mới)
+
+➤ GIỮ LẠI (Backward Compatibility):
+
+   - client variable (deprecated)
+   - get_openai_client() function (deprecated)
+   - luu_tu_vung() function (deprecated)
+   - chay_gia_su() function (deprecated)
+   
+   → Code cũ vẫn chạy được, nhưng recommend dùng SDK mới
+
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ FILE: home/ai_helper.py                                                  │
+└─────────────────────────────────────────────────────────────────────────┘
+
+➤ THÊM MỚI:
+
+1. Import statements
+   ✓ logging
+   ✓ typing (Optional, Dict, Any, Union)
+   ✓ dataclasses (dataclass, asdict)
+   ✓ Enum
+
+2. TranslationMethod Enum
+   ✓ OPENAI = "AI (OpenAI)"
+   ✓ GOOGLE = "Google Translate"
+   ✓ FALLBACK = "Google Translate (Dự phòng)"
+   
+   Lợi ích: Type-safe constants
+
+3. VocabularyData Dataclass
+   ✓ chinese: str = ""
+   ✓ pinyin: str = ""
+   ✓ vietnamese: str = ""
+   ✓ example_sentence: str = ""
+   ✓ to_dict() method
+
+4. TranslationResult Dataclass
+   ✓ success: bool
+   ✓ method: str
+   ✓ data: Optional[VocabularyData] = None
+   ✓ error: Optional[str] = None
+   ✓ to_dict() method
+   
+   Lợi ích: Structured return value
+
+5. GoogleTranslator Class
+   
+   a) translate(text, source_lang, target_lang)
+      - Static method
+      - Fallback strategy: deep-translator → googletrans
+      - Logging
+      - Error handling
+
+6. VocabularyAIHelper Class
+   
+   a) __init__(api_key, model)
+      - Tùy chỉnh API key và model
+      - Lazy initialization
+      - Tích hợp GoogleTranslator
+   
+   b) client Property
+      - Lazy initialization
+      - Logging
+   
+   c) get_vocabulary_info(chinese, vietnamese)
+      - Main public method
+      - Auto fallback nếu không có OpenAI
+      - Structured return
+      - Logging chi tiết
+   
+   d) _build_prompt(chinese, vietnamese)
+      - Private method
+      - Xây dựng prompt dựa trên input
+   
+   e) _parse_ai_response(text)
+      - Private method
+      - Parse JSON từ AI response
+      - Xử lý markdown code blocks
+   
+   f) _use_google_fallback(chinese, vietnamese)
+      - Private method
+      - Fallback strategy
+      - Return structured result
+
+➤ REFACTOR:
+
+   - translate_with_google() → Dùng GoogleTranslator.translate()
+   - get_ai_vocabulary_info() → Dùng VocabularyAIHelper.get_vocabulary_info()
+   - use_google_translate_fallback() → Dùng _use_google_fallback()
+
+➤ GIỮ LẠI (Backward Compatibility):
+
+   - translate_with_google() function (deprecated)
+   - get_ai_vocabulary_info() function (deprecated)
+   - use_google_translate_fallback() function (deprecated)
+
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ FILE MỚI: AI_SDK_README.md                                               │
+└─────────────────────────────────────────────────────────────────────────┘
+
+➤ NỘI DUNG:
+
+1. Tổng quan về 2 SDK
+2. Hướng dẫn cài đặt và cấu hình
+3. Ví dụ sử dụng chi tiết
+4. API Reference
+5. Tính năng nổi bật
+6. Kiến trúc SDK
+7. Tích hợp với Django
+8. Error handling
+9. Logging
+10. Backward compatibility
+11. Best practices
+12. Troubleshooting
+13. Performance tips
+
+================================================================================
+6. HƯỚNG DẪN SỬ DỤNG SDK MỚI
+================================================================================
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ A. SỬ DỤNG ChineseAIEngine                                               │
+└─────────────────────────────────────────────────────────────────────────┘
+
+1. CÁCH CƠ BẢN NHẤT:
+   
+   from translator.ai_engine import ChineseAIEngine
+   
+   engine = ChineseAIEngine()
+   result = engine.translate("你好")
+   print(result)
+
+2. TÙY CHỈNH CONFIG:
+   
+   from translator.ai_engine import ChineseAIEngine, AIConfig, ModelType
+   
+   config = AIConfig(
+       api_key="sk-your-key",
+       model=ModelType.GPT4O.value,
+       temperature=0.5,
+       max_tokens=1500,
+       timeout=60,
+       max_retries=5
+   )
+   
+   engine = ChineseAIEngine(config=config)
+   result = engine.translate("我喜欢学习中文")
+
+3. LƯU TỪ VỰNG THỦ CÔNG:
+   
+   engine = ChineseAIEngine()
+   result = engine.save_vocabulary(
+       chinese="学习",
+       pinyin="xuéxí",
+       vietnamese="học tập"
+   )
+   print(result)  # ✓ Đã lưu: 学习 (xuéxí)
+
+4. TRONG DJANGO VIEWS:
+   
+   from django.http import JsonResponse
+   from translator.ai_engine import ChineseAIEngine
+   
+   def translate_view(request):
+       text = request.POST.get('text', '')
+       
+       engine = ChineseAIEngine()
+       result = engine.translate(text)
+       
+       return JsonResponse({
+           'success': True,
+           'result': result
+       })
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ B. SỬ DỤNG VocabularyAIHelper                                            │
+└─────────────────────────────────────────────────────────────────────────┘
+
+1. TỪ TIẾNG TRUNG → THÔNG TIN ĐẦY ĐỦ:
+   
+   from home.ai_helper import VocabularyAIHelper
+   
+   helper = VocabularyAIHelper()
+   result = helper.get_vocabulary_info(chinese="学习")
+   
+   print(result)
+   # {
+   #     "success": True,
+   #     "method": "AI (OpenAI)",
+   #     "data": {
+   #         "chinese": "学习",
+   #         "pinyin": "xuéxí",
+   #         "vietnamese": "học tập",
+   #         "example_sentence": "我喜欢学习中文..."
+   #     }
+   # }
+
+2. TỪ TIẾNG VIỆT → TÌM CHỮ TRUNG:
+   
+   helper = VocabularyAIHelper()
+   result = helper.get_vocabulary_info(vietnamese="bạn bè")
+   
+   print(result['data']['chinese'])   # 朋友
+   print(result['data']['pinyin'])    # péngyǒu
+
+3. SỬ DỤNG GPT-4:
+   
+   helper = VocabularyAIHelper(model="gpt-4-turbo-preview")
+   result = helper.get_vocabulary_info(chinese="困难")
+
+4. TRONG DJANGO VIEWS:
+   
+   from django.http import JsonResponse
+   from home.ai_helper import VocabularyAIHelper
+   
+   def auto_fill_vocabulary(request):
+       chinese = request.POST.get('chinese', '')
+       
+       helper = VocabularyAIHelper()
+       result = helper.get_vocabulary_info(chinese=chinese)
+       
+       if result['success']:
+           return JsonResponse({
+               'success': True,
+               'data': result['data']
+           })
+       else:
+           return JsonResponse({
+               'success': False,
+               'error': result.get('error', 'Unknown error')
+           })
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ C. SỬ DỤNG GoogleTranslator (Fallback)                                   │
+└─────────────────────────────────────────────────────────────────────────┘
+
+from home.ai_helper import GoogleTranslator
+
+translator = GoogleTranslator()
+
+# Dịch Trung → Việt
+result = translator.translate("你好", source_lang="zh-CN", target_lang="vi")
+print(result["translated"])  # xin chào
+
+# Dịch Việt → Trung
+result = translator.translate("xin chào", source_lang="vi", target_lang="zh-CN")
+print(result["translated"])  # 你好
+
+================================================================================
+7. LỢI ÍCH CỦA SDK
+================================================================================
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 1. CODE SẠCH, DỄ ĐỌC                                                    │
+└─────────────────────────────────────────────────────────────────────────┘
+
+❌ CODE CŨ (50+ dòng):
+    
+    client = get_openai_client()
+    if not client:
+        return "Lỗi..."
+    
+    prompt = """..."""
+    messages = [...]
+    
+    try:
+        response = client.chat.completions.create(...)
+        message = response.choices[0].message
+        
+        if message.tool_calls:
+            messages.append(message)
+            for tool_call in message.tool_calls:
+                args = json.loads(...)
+                result = luu_tu_vung(...)
+                messages.append(...)
+            
+            final_response = client.chat.completions.create(...)
+            return final_response.choices[0].message.content
+        
+        return message.content
+    except Exception as e:
+        return f"Lỗi: {e}"
+
+✅ CODE MỚI (2 dòng):
+
+    engine = ChineseAIEngine()
+    result = engine.translate("你好")
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 2. XỬ LÝ LỖI TOÀN DIỆN                                                  │
+└─────────────────────────────────────────────────────────────────────────┘
+
+✓ Validate API key ngay khi khởi tạo
+✓ Auto retry khi network lỗi (configurable max_retries)
+✓ Timeout để tránh treo (configurable timeout)
+✓ Fallback sang Google Translate nếu OpenAI lỗi
+✓ Logging chi tiết để debug
+✓ Error messages rõ ràng
+
+Ví dụ:
+
+    # Nếu không có API key
+    → ValueError: "API key không tồn tại. Vui lòng cấu hình..."
+    
+    # Nếu network lỗi
+    → Tự động retry 3 lần (mặc định)
+    → Nếu vẫn lỗi: "✗ Lỗi kết nối OpenAI: ..."
+    
+    # Nếu OpenAI hết quota
+    → VocabularyAIHelper tự động fallback sang Google Translate
+    → Log: "WARNING: OpenAI not available, using Google Translate"
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 3. DỄ TÙY CHỈNH                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+
+✓ Đổi model dễ dàng:
+    
+    config = AIConfig(model=ModelType.GPT35_TURBO.value)
+    engine = ChineseAIEngine(config=config)
+
+✓ Điều chỉnh temperature:
+    
+    config = AIConfig(temperature=0.7)  # Sáng tạo hơn
+    engine = ChineseAIEngine(config=config)
+
+✓ Tăng timeout cho network chậm:
+    
+    config = AIConfig(timeout=120)
+    engine = ChineseAIEngine(config=config)
+
+✓ Tăng số lần retry:
+    
+    config = AIConfig(max_retries=10)
+    engine = ChineseAIEngine(config=config)
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 4. LOGGING CHI TIẾT                                                      │
+└─────────────────────────────────────────────────────────────────────────┘
+
+SDK tự động log các hoạt động:
+
+INFO:translator.ai_engine:✓ OpenAI client initialized successfully
+INFO:translator.ai_engine:→ Translating: 你好
+INFO:translator.ai_engine:✓ Saved vocabulary: 你好
+INFO:translator.ai_engine:✓ Translation completed
+
+ERROR:translator.ai_engine:✗ Failed to initialize OpenAI client: Invalid API key
+ERROR:translator.ai_engine:✗ Translation error: Connection timeout
+
+WARNING:home.ai_helper:OpenAI not available, using Google Translate
+INFO:home.ai_helper:✓ Translated with deep-translator: 你好...
+
+Có thể tùy chỉnh logging level:
+
+    import logging
+    logging.basicConfig(level=logging.DEBUG)  # Chi tiết hơn
+    logging.basicConfig(level=logging.WARNING)  # Chỉ warnings và errors
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 5. TYPE-SAFE VỚI DATACLASSES                                            │
+└─────────────────────────────────────────────────────────────────────────┘
+
+❌ CODE CŨ (Dict - dễ lỗi):
+
+    result = get_ai_vocabulary_info(chinese="你好")
+    print(result["data"]["pinin"])  # TYPO! Sẽ lỗi KeyError
+
+✅ CODE MỚI (Dataclass - có structure):
+
+    helper = VocabularyAIHelper()
+    result = helper.get_vocabulary_info(chinese="你好")
+    
+    # IDE sẽ autocomplete
+    print(result['data']['pinyin'])  # Đúng!
+    
+    # Có thể validate type
+    data = VocabularyData(**result['data'])
+    print(data.pinyin)
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 6. DỄ TEST                                                               │
+└─────────────────────────────────────────────────────────────────────────┘
+
+✓ Có thể mock OpenAI client dễ dàng
+✓ Có thể test từng method riêng
+✓ Có thể test với config khác nhau
+
+Ví dụ test:
+
+    import unittest
+    from unittest.mock import Mock, patch
+    from translator.ai_engine import ChineseAIEngine, AIConfig
+    
+    class TestChineseAIEngine(unittest.TestCase):
+        
+        def test_save_vocabulary(self):
+            engine = ChineseAIEngine()
+            result = engine.save_vocabulary("你好", "nǐhǎo", "xin chào")
+            self.assertIn("✓ Đã lưu", result)
+        
+        @patch('translator.ai_engine.OpenAI')
+        def test_translate_with_mock(self, mock_openai):
+            # Mock OpenAI response
+            mock_client = Mock()
+            mock_openai.return_value = mock_client
+            
+            engine = ChineseAIEngine()
+            result = engine.translate("你好")
+            
+            # Assert
+            mock_client.chat.completions.create.assert_called_once()
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 7. DỄ MỞ RỘNG                                                            │
+└─────────────────────────────────────────────────────────────────────────┘
+
+✓ Dễ thêm method mới
+✓ Dễ thêm tool/function mới
+✓ Dễ thêm model mới
+
+Ví dụ thêm method mới:
+
+    class ChineseAIEngine:
+        
+        # Method có sẵn
+        def translate(self, text: str) -> str:
+            ...
+        
+        # Thêm method mới
+        def batch_translate(self, texts: List[str]) -> List[str]:
+            """Dịch nhiều văn bản cùng lúc"""
+            results = []
+            for text in texts:
+                result = self.translate(text)
+                results.append(result)
+            return results
+        
+        # Thêm method mới
+        def translate_with_context(self, text: str, context: str) -> str:
+            """Dịch với ngữ cảnh"""
+            prompt = f"Ngữ cảnh: {context}\n\nDịch: {text}"
+            return self.translate(prompt)
+
+================================================================================
+8. VÍ DỤ THỰC TẾ TRONG DJANGO
+================================================================================
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ A. VIEWS.PY - Sử dụng trong Django views                                 │
+└─────────────────────────────────────────────────────────────────────────┘
+
+from django.shortcuts import render
+from django.http import JsonResponse
+from translator.ai_engine import ChineseAIEngine
+from home.ai_helper import VocabularyAIHelper
+
+
+def translate_view(request):
+    """View để dịch văn bản Trung-Việt hoặc Việt-Trung"""
+    
+    if request.method == 'POST':
+        text = request.POST.get('text', '')
+        
+        if not text:
+            return JsonResponse({
+                'success': False,
+                'error': 'Vui lòng nhập văn bản'
+            })
+        
+        try:
+            # Sử dụng SDK
+            engine = ChineseAIEngine()
+            result = engine.translate(text)
+            
+            return JsonResponse({
+                'success': True,
+                'result': result
+            })
+            
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'error': str(e)
+            })
+    
+    return render(request, 'translate.html')
+
+
+def auto_fill_vocabulary_view(request):
+    """View tự động điền thông tin từ vựng"""
+    
+    if request.method == 'POST':
+        chinese = request.POST.get('chinese', '')
+        vietnamese = request.POST.get('vietnamese', '')
+        
+        if not chinese and not vietnamese:
+            return JsonResponse({
+                'success': False,
+                'error': 'Vui lòng nhập tiếng Trung hoặc tiếng Việt'
+            })
+        
+        try:
+            # Sử dụng SDK
+            helper = VocabularyAIHelper()
+            result = helper.get_vocabulary_info(
+                chinese=chinese or None,
+                vietnamese=vietnamese or None
+            )
+            
+            return JsonResponse(result)
+            
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'error': str(e)
+            })
+    
+    return render(request, 'add_vocabulary.html')
+
+
+def batch_translate_view(request):
+    """View dịch nhiều từ cùng lúc"""
+    
+    if request.method == 'POST':
+        texts = request.POST.getlist('texts[]')  # Nhận array
+        
+        if not texts:
+            return JsonResponse({
+                'success': False,
+                'error': 'Không có văn bản nào'
+            })
+        
+        try:
+            engine = ChineseAIEngine()
+            results = []
+            
+            for text in texts:
+                result = engine.translate(text)
+                results.append({
+                    'input': text,
+                    'output': result
+                })
+            
+            return JsonResponse({
+                'success': True,
+                'results': results
+            })
+            
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'error': str(e)
+            })
+    
+    return render(request, 'batch_translate.html')
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ B. FORMS.PY - Tích hợp với Django forms                                  │
+└─────────────────────────────────────────────────────────────────────────┘
+
+from django import forms
+from home.ai_helper import VocabularyAIHelper
+
+
+class VocabularyForm(forms.Form):
+    chinese = forms.CharField(
+        max_length=100, 
+        required=False,
+        label="Từ tiếng Trung"
+    )
+    vietnamese = forms.CharField(
+        max_length=200, 
+        required=False,
+        label="Nghĩa tiếng Việt"
+    )
+    pinyin = forms.CharField(
+        max_length=100, 
+        required=False,
+        label="Phiên âm Pinyin"
+    )
+    example_sentence = forms.CharField(
+        widget=forms.Textarea,
+        required=False,
+        label="Câu ví dụ"
+    )
+    
+    def clean(self):
+        cleaned_data = super().clean()
+        chinese = cleaned_data.get('chinese')
+        vietnamese = cleaned_data.get('vietnamese')
+        
+        if not chinese and not vietnamese:
+            raise forms.ValidationError(
+                "Vui lòng nhập ít nhất tiếng Trung hoặc tiếng Việt"
+            )
+        
+        return cleaned_data
+    
+    def auto_fill(self):
+        """Tự động điền thông tin bằng AI"""
+        chinese = self.cleaned_data.get('chinese')
+        vietnamese = self.cleaned_data.get('vietnamese')
+        
+        helper = VocabularyAIHelper()
+        result = helper.get_vocabulary_info(
+            chinese=chinese or None,
+            vietnamese=vietnamese or None
+        )
+        
+        if result['success']:
+            data = result['data']
+            self.fields['chinese'].initial = data['chinese']
+            self.fields['vietnamese'].initial = data['vietnamese']
+            self.fields['pinyin'].initial = data['pinyin']
+            self.fields['example_sentence'].initial = data['example_sentence']
+        
+        return result
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ C. MANAGEMENT COMMAND - Tạo command để test SDK                          │
+└─────────────────────────────────────────────────────────────────────────┘
+
+# home/management/commands/test_sdk.py
+
+from django.core.management.base import BaseCommand
+from translator.ai_engine import ChineseAIEngine
+from home.ai_helper import VocabularyAIHelper
+
+
+class Command(BaseCommand):
+    help = 'Test AI SDK'
+    
+    def add_arguments(self, parser):
+        parser.add_argument(
+            '--translate',
+            type=str,
+            help='Dịch văn bản'
+        )
+        parser.add_argument(
+            '--vocab',
+            type=str,
+            help='Lấy thông tin từ vựng'
+        )
+    
+    def handle(self, *args, **options):
+        
+        if options['translate']:
+            self.stdout.write("Testing ChineseAIEngine...")
+            engine = ChineseAIEngine()
+            result = engine.translate(options['translate'])
+            self.stdout.write(self.style.SUCCESS(result))
+        
+        if options['vocab']:
+            self.stdout.write("Testing VocabularyAIHelper...")
+            helper = VocabularyAIHelper()
+            result = helper.get_vocabulary_info(chinese=options['vocab'])
+            
+            if result['success']:
+                data = result['data']
+                self.stdout.write(self.style.SUCCESS(
+                    f"Chinese: {data['chinese']}\n"
+                    f"Pinyin: {data['pinyin']}\n"
+                    f"Vietnamese: {data['vietnamese']}\n"
+                    f"Example: {data['example_sentence']}"
+                ))
+            else:
+                self.stdout.write(self.style.ERROR(result.get('error')))
+
+# Cách sử dụng:
+# python manage.py test_sdk --translate "你好"
+# python manage.py test_sdk --vocab "学习"
+
+================================================================================
+9. KẾT LUẬN
+================================================================================
+
+➤ ĐÃ THAY ĐỔI GÌ?
+
+   ✓ Code từ Functional Programming → Object-Oriented Programming
+   ✓ Code từ rải rác → Structured SDK
+   ✓ Từ không có error handling → Error handling toàn diện
+   ✓ Từ hard-coded values → Configurable
+   ✓ Từ print() → Logging system
+   ✓ Từ dict thuần → Dataclasses
+   ✓ Từ không có docs → Full documentation
+
+➤ LỢI ÍCH?
+
+   ✓ Code sạch hơn (2 dòng thay vì 50 dòng)
+   ✓ Dễ sử dụng hơn (chỉ cần khởi tạo và gọi method)
+   ✓ Dễ maintain hơn (thay đổi 1 chỗ áp dụng toàn bộ)
+   ✓ Ít bug hơn (type-safe, error handling)
+   ✓ Dễ mở rộng hơn (thêm method/function mới dễ dàng)
+   ✓ Dễ test hơn (có thể mock và unit test)
+   ✓ Professional hơn (theo chuẩn SDK)
+
+➤ CODE CŨ VẪN CHẠY ĐƯỢC?
+
+   ✓ CÓ! Tất cả function cũ đều được giữ lại
+   ✓ Backward compatible 100%
+   ✓ Có thể migrate dần dần sang SDK mới
+
+➤ KHUYẾN NGHỊ?
+
+   ✓ Dùng SDK mới cho code mới
+   ✓ Migrate code cũ dần dần
+   ✓ Đọc AI_SDK_README.md để hiểu rõ hơn
+   ✓ Test kỹ trước khi deploy production
+
+================================================================================
+                            HẾT TÀI LIỆU
+================================================================================
+
+Tài liệu này giải thích chi tiết về:
+- SDK là gì và tại sao cần nó
+- Những thay đổi trong dự án
+- So sánh code cũ vs code mới
+- Cách sử dụng SDK mới
+- Lợi ích của SDK
+- Ví dụ thực tế
+
+Nếu có thắc mắc, tham khảo:
+- AI_SDK_README.md (documentation chi tiết)
+- Code trong translator/ai_engine.py (có docstring)
+- Code trong home/ai_helper.py (có docstring)
+
+Version: 1.0
+Last Updated: February 8, 2026
