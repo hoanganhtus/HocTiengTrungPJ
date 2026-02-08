@@ -136,11 +136,6 @@ class VocabularyAIHelper:
         chinese: Optional[str] = None, 
         vietnamese: Optional[str] = None
     ) -> Dict[str, Any]:
-    def get_vocabulary_info(
-        self, 
-        chinese: Optional[str] = None, 
-        vietnamese: Optional[str] = None
-    ) -> Dict[str, Any]:
         """
         Tự động điền thông tin từ vựng bằng AI
         
