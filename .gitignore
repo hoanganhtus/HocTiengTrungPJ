@@ -48,3 +48,7 @@ Thumbs.db
 # Environment variables
 .env
 .env.local
+
+
+# notebooks
+GIAI_THICH_SDK.txt
