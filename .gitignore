@@ -49,6 +49,6 @@ Thumbs.db
 .env
 .env.local
 
-
-# notebooks
+# Documentation files - not for GitHub
+AI_SDK_README.md
 GIAI_THICH_SDK.txt
